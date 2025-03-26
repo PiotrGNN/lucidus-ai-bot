@@ -1,67 +1,124 @@
+import React, { useEffect, useState } from 'react';
+import { Line } from 'react-chartjs-2';
 
-import React, { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Line } from "react-chartjs-2";
-import { Button } from "@/components/ui/button";
-
-const LucidusDashboard = () => {
-  const [portfolio, setPortfolio] = useState(10.0);
+export default function LucidusDashboard() {
+  const [decision, setDecision] = useState(null);
+  const [error, setError] = useState(null);
+  const [mode, setMode] = useState("live");
   const [log, setLog] = useState([]);
-  const [sentimentData, setSentimentData] = useState([]);
+  const [balance, setBalance] = useState(10.00);
+  const [history, setHistory] = useState([]);
 
-  useEffect(() => {
-    const mockLog = [
-      { timestamp: "09:00", decision: "BUY", source: "AI + Logic", price: 2460.2 },
-      { timestamp: "09:15", decision: "SELL", source: "Logic", price: 2473.6 },
-    ];
-    const mockSentiment = [0.1, 0.4, 0.6, 0.3, 0.7, 0.2];
-
-    setLog(mockLog);
-    setSentimentData(mockSentiment);
-  }, []);
-
-  const sentimentChart = {
-    labels: sentimentData.map((_, i) => `t-${i}`),
-    datasets: [
-      {
-        label: "Sentiment",
-        data: sentimentData,
-        fill: false,
-        tension: 0.3,
-      },
-    ],
+  const fallbackDecision = () => {
+    const options = ["Kupuj", "Sprzedaj", "Czekaj"];
+    return options[Math.floor(Math.random() * options.length)];
   };
 
+  const fakeAIReason = (decision) => {
+    switch (decision) {
+      case "Kupuj": return "🟢 Trend wzrostowy na RSI i MACD";
+      case "Sprzedaj": return "🔴 Sygnał odwrócenia na wykresie świecowym";
+      default: return "🟡 Brak silnego sygnału – obserwacja rynku";
+    }
+  };
+
+  const simulateProfit = (decision) => {
+    const delta = {
+      "Kupuj": Math.random() * 0.4,
+      "Sprzedaj": Math.random() * 0.4,
+      "Czekaj": 0
+    };
+    const sign = decision === "Kupuj" ? 1 : decision === "Sprzedaj" ? -1 : 0;
+    return +(balance + sign * delta[decision]).toFixed(2);
+  };
+
+  const getSignal = async () => {
+    setError(null);
+    setMode("live");
+    try {
+      const response = await fetch('https://lucidus-backend.onrender.com/predict');
+      if (!response.ok) throw new Error("Brak odpowiedzi");
+      const data = await response.json();
+      updateDashboard(data?.decision || fallbackDecision());
+    } catch (err) {
+      setMode("offline");
+      const simulated = fallbackDecision();
+      setError("Backend offline – tryb symulowany");
+      updateDashboard(simulated);
+    }
+  };
+
+  const updateDashboard = (newDecision) => {
+    setDecision(newDecision);
+    const explanation = fakeAIReason(newDecision);
+    const updatedBalance = simulateProfit(newDecision);
+    setBalance(updatedBalance);
+    setLog((prev) => [`${newDecision}: ${explanation}`, ...prev.slice(0, 4)]);
+    setHistory((prev) => [...prev.slice(-9), updatedBalance]);
+  };
+
+  useEffect(() => {
+    getSignal(); // Run once on mount
+    const interval = setInterval(getSignal, 10000); // Refresh every 10s
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card className="bg-white shadow-xl">
-        <CardContent>
-          <h2 className="text-xl font-bold mb-2">Lucidus Portfolio</h2>
-          <p>Current Value: ${portfolio.toFixed(2)} USD</p>
-        </CardContent>
-      </Card>
+    <div style={{ textAlign: 'center', padding: '2rem' }}>
+      <h1>🚀 Lucidus Dashboard</h1>
+      <p>Twoja AI do tradingu właśnie wystartowała.</p>
 
-      <Card className="bg-white shadow-xl">
-        <CardContent>
-          <h2 className="text-xl font-bold mb-2">Sentiment Trend</h2>
-          <Line data={sentimentChart} />
-        </CardContent>
-      </Card>
+      <div style={{ margin: '1rem' }}>
+        <button onClick={getSignal} style={{
+          padding: '10px 20px',
+          fontSize: '1rem',
+          backgroundColor: '#111',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: 'pointer'
+        }}>
+          🔍 Sprawdź sygnał
+        </button>
+      </div>
 
-      <Card className="bg-white shadow-xl col-span-2">
-        <CardContent>
-          <h2 className="text-xl font-bold mb-4">Decision Log</h2>
-          <ul className="space-y-2">
-            {log.map((entry, i) => (
-              <li key={i} className="border-b pb-2">
-                <strong>{entry.timestamp}</strong> — {entry.decision} @ ${entry.price} <em>({entry.source})</em>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      {decision && (
+        <p style={{ fontSize: '1.5rem' }}>
+          🧠 Decyzja AI: <strong>{decision}</strong><br />
+          <span style={{ fontSize: '0.9rem', color: mode === "offline" ? "orange" : "green" }}>
+            ({mode === "offline" ? "tryb offline" : "na żywo"})
+          </span>
+        </p>
+      )}
+
+      <p style={{ color: 'orange' }}>{error}</p>
+
+      <h3 style={{ marginTop: '2rem' }}>💰 Symulowane saldo: <span style={{ color: '#00c77b' }}>${balance}</span></h3>
+
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <Line
+          data={{
+            labels: history.map((_, idx) => `#${idx + 1}`),
+            datasets: [
+              {
+                label: "Wartość portfela ($)",
+                data: history,
+                fill: false,
+                borderColor: "#007bff",
+              }
+            ]
+          }}
+        />
+      </div>
+
+      <div style={{ marginTop: '2rem' }}>
+        <h4>🧾 Logi AI (ostatnie decyzje)</h4>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {log.map((entry, idx) => (
+            <li key={idx} style={{ margin: '0.5rem 0', fontSize: '0.95rem' }}>– {entry}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
-};
-
-export default LucidusDashboard;
+}
