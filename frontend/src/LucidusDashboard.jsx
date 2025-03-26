@@ -1,4 +1,5 @@
 import React from 'react';
+import LucidusSignal from './LucidusSignal';
 
 export default function LucidusDashboard() {
   return (
@@ -11,6 +12,7 @@ export default function LucidusDashboard() {
     }}>
       <h1>🚀 Lucidus Dashboard</h1>
       <p>Twoja AI do tradingu właśnie wystartowała.</p>
+      <LucidusSignal />
     </div>
   );
 }
