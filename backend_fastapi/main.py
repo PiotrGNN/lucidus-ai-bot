@@ -11,7 +11,17 @@ import os
 model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
 model = joblib.load(model_path)
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # zmień na ["http://localhost:3000"] jeśli chcesz ograniczyć
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 model = joblib.load("model.pkl")
 
 class MarketFeatures(BaseModel):
